@@ -1,54 +1,69 @@
 "use client";
-import { useState } from "react";
 import Link from "next/link";
 
 export default function Navbar() {
-    const [isOpen, setIsOpen] = useState(false);
-
     return (
-        <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-black/80 backdrop-blur-xl">
-            <div className="max-w-7xl mx-auto px-6">
-                <div className="flex h-16 items-center justify-between md:justify-center">
-
-                    <div className="md:absolute md:left-6 font-bold text-xl tracking-tighter text-white">
-                        <Link href="/">
-                            LENS<span className="text-blue-500">QUEST</span>
+        <nav
+            className="sticky top-0 z-50 w-full border-b border-white/10"
+            style={{
+                position: 'sticky',
+                top: 0,
+                backgroundColor: '#000000',
+                WebkitBackdropFilter: 'blur(20px)',
+                backdropFilter: 'blur(20px)',
+                width: '100%',
+                zIndex: 1000
+            }}
+        >
+            <div className="max-w-7xl mx-auto px-4" style={{ height: '64px' }}>
+                <div
+                    style={{
+                        display: 'flex',
+                        height: '100%',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        width: '100%'
+                    }}
+                >
+                    <div className="font-bold text-lg md:text-xl text-white">
+                        <Link href="/" style={{ textDecoration: 'none', color: 'white', display: 'block' }}>
+                            LENS<span style={{ color: '#3b82f6' }}>QUEST</span>
                         </Link>
                     </div>
 
-                    <button
-                        className="md:hidden text-white p-2"
-                        onClick={() => setIsOpen(!isOpen)}
+                    <ul
+                        style={{
+                            listStyle: 'none',
+                            margin: 0,
+                            padding: 0,
+                            display: 'flex',
+                            flexDirection: 'row',
+                            whiteSpace: 'nowrap'
+                        }}
                     >
-                        {isOpen ? "✕" : "☰"}
-                    </button>
-
-                    <ul className="hidden md:flex flex-row items-center gap-2">
-                        <NavLink href="/">Home</NavLink>
                         <NavLink href="/play">Play</NavLink>
                         <NavLink href="/leaderboard">Leaderboard</NavLink>
                     </ul>
                 </div>
-
-                {isOpen && (
-                    <ul className="md:hidden flex flex-col items-center gap-4 pb-6 pt-2 border-t border-white/5">
-                        <NavLink href="/" onClick={() => setIsOpen(false)}>Home</NavLink>
-                        <NavLink href="/play" onClick={() => setIsOpen(false)}>Play</NavLink>
-                        <NavLink href="/leaderboard" onClick={() => setIsOpen(false)}>Leaderboard</NavLink>
-                    </ul>
-                )}
             </div>
         </nav>
     );
 }
 
-function NavLink({ href, children, onClick }: { href: string; children: React.ReactNode; onClick?: () => void }) {
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
     return (
-        <li className="list-none">
+        <li style={{ display: 'inline-block' }}>
             <Link
                 href={href}
-                onClick={onClick}
-                className="text-gray-400 hover:text-white px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 hover:bg-white/5 block"
+                className="text-gray-400 hover:text-white"
+                style={{
+                    display: 'block',
+                    padding: '8px 12px',
+                    textDecoration: 'none',
+                    fontSize: '14px',
+                    fontWeight: 500,
+                    color: '#9ca3af'
+                }}
             >
                 {children}
             </Link>

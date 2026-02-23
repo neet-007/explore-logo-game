@@ -4,25 +4,25 @@ export default function EEExplore() {
 
     return (
         <div className="w-full flex flex-col">
-            <img src="/EEEXPLORE-logo.webp" className="w-[30vw] max-w-[300px] h-auto" />
+            <img src="/EEEXPLORE-logo.png" className="w-[30vw] max-w-[300px] h-auto" />
 
             <div className="flex justify-center items-center w-full">
-                <img src="/AI.webp"
+                <img src="/AI.png"
                     className={imgStyle} />
 
-                <img src="/Computer Vision.webp"
+                <img src="/Computer Vision.png"
                     className={imgStyle} />
 
-                <img src="/Cyber security.webp"
+                <img src="/Cyber security.png"
                     className={imgStyle} />
 
-                <img src="/Freelancing.webp"
+                <img src="/Freelancing.png"
                     className={imgStyle} />
 
-                <img src="/Game Development.webp"
+                <img src="/Game Development.png"
                     className={imgStyle} />
 
-                <img src="/Graphic.webp"
+                <img src="/Graphic.png"
                     className={imgMainStyle} />
             </div>
         </div>

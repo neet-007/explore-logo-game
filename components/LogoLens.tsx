@@ -35,19 +35,15 @@ export default function DetectiveReveal({
     const offset = (finalSize * 90) / 200;
 
     return (
-        /* Reverted to your slate styling but kept it sleek */
         <div className={`relative overflow-hidden rounded-2xl border-4 border-slate-700 bg-slate-900 ${className}`}>
 
-            {/* LAYER 1: BASE */}
             <div className="absolute inset-0 z-0">{baseContent}</div>
 
-            {/* LAYER 2: REVEAL */}
             <div
                 className="absolute inset-0 z-10 animate-reveal"
                 style={{
                     animationDuration: duration,
                     backgroundColor: revealBg,
-                    // Ensuring multi-browser support for masking
                     WebkitMaskImage: `radial-gradient(circle ${maskRadius}px at var(--mask-x) var(--mask-y), black 100%, transparent 0%)`,
                     maskImage: `radial-gradient(circle ${maskRadius}px at var(--mask-x) var(--mask-y), black 100%, transparent 0%)`,
                     WebkitMaskRepeat: 'no-repeat',
@@ -61,7 +57,6 @@ export default function DetectiveReveal({
                 </div>
             </div>
 
-            {/* LAYER 3: THE LENS */}
             <div
                 className="pointer-events-none absolute z-20 animate-reveal"
                 style={{
@@ -73,7 +68,6 @@ export default function DetectiveReveal({
                     transform: `translate(-${offset}px, -${offset}px) rotate(-15deg)`,
                 } as React.CSSProperties}
             >
-                {/* Reverted to your original SVG structure with drop-shadow */}
                 <img src="/lens.svg" alt="Lens" className="w-full h-full drop-shadow-2xl" />
             </div>
         </div>
