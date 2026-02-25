@@ -4,6 +4,7 @@ import DetectiveReveal from "@/components/LogoLens";
 import DetectiveRevealStatic from "@/components/LogoLensStatic";
 import EEExplore from "@/components/EEExplore";
 import EEExploreStatic from "@/components/EEExploreStatic";
+import { LENS_CHECKLIST } from "@/constants";
 
 export default function Header() {
     const [viewMode, setViewMode] = useState<'static' | 'modern'>('static');
@@ -16,11 +17,12 @@ export default function Header() {
 
     const revealContent = (
         <div style={{ textAlign: 'center', color: 'white', fontSize: '14px' }}>
-            <p>first reason</p>
-            <p>second reason</p>
-            <p>third reason</p>
-            <p>fourth reason</p>
-            <p>fifth reason</p>
+            {LENS_CHECKLIST.map((item, index) => {
+                return (
+                    <p key={index}>{item.text}<span>{item.is_check ? '✅' : '❌'}</span> </p>
+                );
+            })
+            }
         </div>
     );
 
