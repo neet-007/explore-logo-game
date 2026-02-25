@@ -1,18 +1,18 @@
 export const LENS_CHECKLIST = [
     {
-        text: "(test) السبب الاول",
+        text: "عصري و حديث",
         is_check: false,
     },
     {
-        text: "السبب الثاني",
+        text: "يحتوي نص واضح",
         is_check: true,
     },
     {
-        text: "السبب الثالث",
+        text: "متوازن",
         is_check: false,
     },
     {
-        text: "السبب الرابع",
+        text: "شكل هندسي",
         is_check: true,
     },
 ];

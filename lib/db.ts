@@ -1,6 +1,6 @@
 import { asc, count, desc, eq } from "drizzle-orm";
 import { db } from "@/lib/drizzle";
-import { criteria, questions, submissions } from "@/lib/schema";
+import { adminUsers, criteria, questions, submissions } from "@/lib/schema";
 import type { AnswerPayload, LeaderboardEntry, Question } from "@/lib/types";
 
 let initPromise: Promise<void> | null = null;
@@ -114,27 +114,50 @@ export async function getQuestionsFromDb(): Promise<Question[]> {
 export function calculateQuestionScore(question: Question, selectedCriterionIds: number[]): number {
   const correctIds = question.criteria.filter((c) => c.isOmitted).map((c) => c.id);
   const correctSet = new Set(correctIds);
-  const scorePerCorrectChoice = correctIds.length > 0 ? 1 / correctIds.length : 0;
-
   let questionScore = 0;
+  let hasWrongChoice = false;
 
   for (const selectedId of selectedCriterionIds) {
     if (correctSet.has(selectedId)) {
-      questionScore += scorePerCorrectChoice;
+      questionScore += 1;
     } else {
-      questionScore -= scorePerCorrectChoice;
+      hasWrongChoice = true;
     }
   }
 
-  if (questionScore < 0) {
+  if (hasWrongChoice) {
     questionScore = 0;
   }
 
-  if (questionScore > 1) {
-    questionScore = 1;
+  return questionScore;
+}
+
+export function validateSingleQuestionAnswer(question: Question, selectedCriterionIds: number[]) {
+  const validCriterionIds = new Set(question.criteria.map((criterion) => criterion.id));
+  const correctIds = question.criteria.filter((criterion) => criterion.isOmitted).map((criterion) => criterion.id);
+  const correctSet = new Set(correctIds);
+
+  for (const criterionId of selectedCriterionIds) {
+    if (typeof criterionId !== "number") {
+      throw new Error("invalid_criterion_id_type");
+    }
+
+    if (!validCriterionIds.has(criterionId)) {
+      throw new Error("invalid_criterion_for_question");
+    }
   }
 
-  return Number(questionScore.toFixed(4));
+  const uniqueSelected = Array.from(new Set(selectedCriterionIds));
+  const hasWrongChoice = uniqueSelected.some((criterionId) => !correctSet.has(criterionId));
+  const correctPicked = uniqueSelected.filter((criterionId) => correctSet.has(criterionId)).length;
+  const totalCorrect = correctIds.length;
+  const questionScore = hasWrongChoice ? 0 : correctPicked;
+
+  return {
+    questionScore,
+    correctPicked,
+    totalCorrect,
+  };
 }
 
 export async function calculateGameScore(answers: AnswerPayload[]) {
@@ -146,6 +169,10 @@ export async function calculateGameScore(answers: AnswerPayload[]) {
 
   const questionMap = new Map(questionsFromDb.map((q) => [q.id, q]));
   const answeredQuestionIds = new Set<number>();
+  const maxScore = questionsFromDb.reduce((sum, question) => {
+    const questionMax = question.criteria.filter((criterion) => criterion.isOmitted).length;
+    return sum + questionMax;
+  }, 0);
 
   let totalScore = 0;
 
@@ -165,25 +192,13 @@ export async function calculateGameScore(answers: AnswerPayload[]) {
     answeredQuestionIds.add(answer.questionId);
 
     const question = questionMap.get(answer.questionId)!;
-    const validCriterionIds = new Set(question.criteria.map((c) => c.id));
-
-    for (const criterionId of answer.selectedCriterionIds) {
-      if (typeof criterionId !== "number") {
-        throw new Error("invalid_criterion_id_type");
-      }
-
-      if (!validCriterionIds.has(criterionId)) {
-        throw new Error("invalid_criterion_for_question");
-      }
-    }
-
-    const uniqueSelected = Array.from(new Set(answer.selectedCriterionIds));
-    totalScore += calculateQuestionScore(question, uniqueSelected);
+    const result = validateSingleQuestionAnswer(question, answer.selectedCriterionIds);
+    totalScore += result.questionScore;
   }
 
   return {
-    score: Number(totalScore.toFixed(4)),
-    maxScore: questionsFromDb.length,
+    score: totalScore,
+    maxScore,
   };
 }
 
@@ -245,4 +260,41 @@ export async function addQuestionToDb(input: { logoPath: string; criteria: Array
   });
 
   return questionId;
+}
+
+export async function getAdminByUsername(username: string) {
+  await initDb();
+
+  const rows = await db
+    .select({
+      id: adminUsers.id,
+      username: adminUsers.username,
+      passwordHash: adminUsers.passwordHash,
+      createdAt: adminUsers.createdAt,
+    })
+    .from(adminUsers)
+    .where(eq(adminUsers.username, username))
+    .limit(1);
+
+  return rows[0] || null;
+}
+
+export async function getAdminCount() {
+  await initDb();
+  const [result] = await db.select({ value: count() }).from(adminUsers);
+  return Number(result?.value ?? 0);
+}
+
+export async function addAdminUserToDb(input: { username: string; passwordHash: string }) {
+  await initDb();
+
+  const inserted = await db
+    .insert(adminUsers)
+    .values({
+      username: input.username,
+      passwordHash: input.passwordHash,
+    })
+    .returning({ id: adminUsers.id });
+
+  return inserted[0]?.id ?? null;
 }

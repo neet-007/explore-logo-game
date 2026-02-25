@@ -28,7 +28,7 @@ export default function Header() {
 
     const baseContent = (
         <img
-            src="/AI.webp"
+            src="/header_static.jpg"
             style={{ width: '100%', height: '100%', objectFit: 'contain', opacity: 0.2 }}
         />
     );

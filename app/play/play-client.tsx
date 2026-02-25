@@ -2,29 +2,13 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { getQuestionsAction, submitGameAction } from "@/app/actions/game-actions";
-import type { AnswerPayload, Question } from "@/lib/types";
-
-function calculateLocalQuestionScore(question: Question, selectedCriterionIds: number[]) {
-    const correctIds = question.criteria.filter((c) => c.isOmitted).map((c) => c.id);
-    const correctSet = new Set(correctIds);
-    const scorePerChoice = correctIds.length > 0 ? 1 / correctIds.length : 0;
-
-    let score = 0;
-    for (const criterionId of selectedCriterionIds) {
-        score += correctSet.has(criterionId) ? scorePerChoice : -scorePerChoice;
-    }
-
-    if (score < 0) score = 0;
-    if (score > 1) score = 1;
-
-    return Number(score.toFixed(4));
-}
+import { getQuestionsAction, submitGameAction, validateQuestionAction } from "@/app/actions/game-actions";
+import type { AnswerPayload, PublicQuestion } from "@/lib/types";
 
 export default function PlayClient() {
     const [nameInput, setNameInput] = useState("");
     const [playerName, setPlayerName] = useState("");
-    const [questions, setQuestions] = useState<Question[]>([]);
+    const [questions, setQuestions] = useState<PublicQuestion[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState("");
 
@@ -36,7 +20,9 @@ export default function PlayClient() {
     const [localScore, setLocalScore] = useState(0);
     const [serverScore, setServerScore] = useState<{ score: number; maxScore: number } | null>(null);
     const [submitError, setSubmitError] = useState("");
+    const [questionError, setQuestionError] = useState("");
     const [sendingResult, setSendingResult] = useState(false);
+    const [validatingQuestion, setValidatingQuestion] = useState(false);
     const [hasSubmittedFinal, setHasSubmittedFinal] = useState(false);
 
     const gameStarted = playerName.length > 0;
@@ -44,7 +30,6 @@ export default function PlayClient() {
     const currentQuestion = gameStarted && questions.length > 0 && currentIndex < questions.length ? questions[currentIndex] : null;
 
     async function startGame() {
-        alert("startGame");
         const cleanName = nameInput.trim();
         if (!cleanName) {
             setLoadError("Please enter your name first.");
@@ -61,7 +46,7 @@ export default function PlayClient() {
                 return;
             }
 
-            const loadedQuestions = (result.questions || []) as Question[];
+            const loadedQuestions = (result.questions || []) as PublicQuestion[];
             if (loadedQuestions.length === 0) {
                 setLoadError("No questions available.");
                 return;
@@ -76,16 +61,13 @@ export default function PlayClient() {
             setLocalScore(0);
             setServerScore(null);
             setSubmitError("");
+            setQuestionError("");
             setHasSubmittedFinal(false);
         } catch {
             setLoadError("Could not connect to server.");
         } finally {
             setLoading(false);
         }
-    }
-
-    function handleStartGame() {
-        startGame();
     }
 
     function toggleCriterion(questionId: number, criterionId: number) {
@@ -102,7 +84,7 @@ export default function PlayClient() {
         }));
     }
 
-    function submitCurrentQuestion() {
+    async function submitCurrentQuestion() {
         if (!currentQuestion) {
             return;
         }
@@ -112,27 +94,38 @@ export default function PlayClient() {
         }
 
         const selectedUnique = Array.from(new Set(selectedByQuestion[currentQuestion.id] || []));
-        const score = calculateLocalQuestionScore(currentQuestion, selectedUnique);
-        const totalCorrect = currentQuestion.criteria.filter((criterion) => criterion.isOmitted).length;
-        const correctPicked = selectedUnique.filter((criterionId) =>
-            currentQuestion.criteria.some((criterion) => criterion.id === criterionId && criterion.isOmitted)
-        ).length;
+        setQuestionError("");
+        setValidatingQuestion(true);
 
-        setSelectedByQuestion((prev) => ({
-            ...prev,
-            [currentQuestion.id]: selectedUnique,
-        }));
+        try {
+            const result = await validateQuestionAction({
+                questionId: currentQuestion.id,
+                selectedCriterionIds: selectedUnique,
+            });
 
-        setSubmittedByQuestion((prev) => ({
-            ...prev,
-            [currentQuestion.id]: true,
-        }));
-        setResultByQuestion((prev) => ({
-            ...prev,
-            [currentQuestion.id]: { correctPicked, totalCorrect },
-        }));
+            if (!result.ok) {
+                setQuestionError(result.error || "Failed to validate answer.");
+                return;
+            }
 
-        setLocalScore((prev) => Number((prev + score).toFixed(4)));
+            setSelectedByQuestion((prev) => ({
+                ...prev,
+                [currentQuestion.id]: selectedUnique,
+            }));
+
+            setSubmittedByQuestion((prev) => ({
+                ...prev,
+                [currentQuestion.id]: true,
+            }));
+            setResultByQuestion((prev) => ({
+                ...prev,
+                [currentQuestion.id]: { correctPicked: result.correctPicked, totalCorrect: result.totalCorrect },
+            }));
+
+            setLocalScore((prev) => prev + result.questionScore);
+        } finally {
+            setValidatingQuestion(false);
+        }
     }
 
     async function submitFinalAnswers() {
@@ -208,7 +201,7 @@ export default function PlayClient() {
                     />
                     <div>
                         <button
-                            onClick={handleStartGame}
+                            onClick={startGame}
                             disabled={loading}
                             style={{
                                 padding: "10px 14px",
@@ -275,19 +268,21 @@ export default function PlayClient() {
                     {!submittedByQuestion[currentQuestion.id] && (
                         <button
                             onClick={submitCurrentQuestion}
+                            disabled={validatingQuestion}
                             style={{
                                 marginTop: "8px",
                                 padding: "10px 14px",
-                                backgroundColor: "#16a34a",
+                                backgroundColor: validatingQuestion ? "#4b5563" : "#16a34a",
                                 color: "white",
                                 border: "none",
                                 borderRadius: "6px",
                                 cursor: "pointer",
                             }}
                         >
-                            Submit Answer
+                            {validatingQuestion ? "Checking..." : "Submit Answer"}
                         </button>
                     )}
+                    {questionError && <p style={{ color: "#fca5a5", marginTop: "8px" }}>{questionError}</p>}
 
                     {submittedByQuestion[currentQuestion.id] && (
                         <div style={{ marginTop: "14px" }}>
@@ -312,16 +307,15 @@ export default function PlayClient() {
                         </div>
                     )}
 
-                    <p style={{ marginTop: "14px", color: "#d4d4d8" }}>Local score: {localScore.toFixed(4)}</p>
+                    <p style={{ marginTop: "14px", color: "#d4d4d8" }}>score: {localScore}</p>
                 </section>
             )}
 
             {gameFinished && (
                 <section style={{ border: "1px solid #2a2a2a", borderRadius: "8px", padding: "16px", backgroundColor: "#111111" }}>
                     <h2 style={{ fontSize: "22px", marginBottom: "8px" }}>Game Finished</h2>
-                    <p style={{ marginBottom: "6px" }}>Local score (client): {localScore.toFixed(4)} / {questions.length}</p>
                     {sendingResult && <p>Submitting final answers to backend...</p>}
-                    {serverScore && <p style={{ marginBottom: "6px" }}>Backend verified score: {serverScore.score} / {serverScore.maxScore}</p>}
+                    {serverScore && <p style={{ marginBottom: "6px" }}>Final score: {serverScore.score} / {serverScore.maxScore}</p>}
                     {submitError && <p style={{ color: "#fca5a5", marginBottom: "6px" }}>{submitError}</p>}
 
                     <Link

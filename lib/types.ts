@@ -10,6 +10,17 @@ export type Question = {
   criteria: Criterion[];
 };
 
+export type PublicCriterion = {
+  id: number;
+  textAr: string;
+};
+
+export type PublicQuestion = {
+  id: number;
+  logoPath: string;
+  criteria: PublicCriterion[];
+};
+
 export type AnswerPayload = {
   questionId: number;
   selectedCriterionIds: number[];

@@ -14,9 +14,9 @@ export const getLeaderboardCached = unstable_cache(async () => {
 });
 
 export function invalidateQuestionsCache() {
-  revalidateTag("questions");
+  revalidateTag("questions", "max");
 }
 
 export function invalidateLeaderboardCache() {
-  revalidateTag("leaderboard");
+  revalidateTag("leaderboard", "max");
 }

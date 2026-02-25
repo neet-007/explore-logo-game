@@ -46,13 +46,12 @@ export default function LeaderboardClient({
         {!loading && !error && entries.length === 0 && <p>No entries yet.</p>}
 
         {!loading && !error && entries.length > 0 && (
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "520px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "420px" }}>
             <thead>
               <tr>
                 <th style={{ textAlign: "left", borderBottom: "1px solid #3f3f46", padding: "8px" }}>#</th>
                 <th style={{ textAlign: "left", borderBottom: "1px solid #3f3f46", padding: "8px" }}>Player</th>
                 <th style={{ textAlign: "left", borderBottom: "1px solid #3f3f46", padding: "8px" }}>Score</th>
-                <th style={{ textAlign: "left", borderBottom: "1px solid #3f3f46", padding: "8px" }}>Date</th>
               </tr>
             </thead>
             <tbody>
@@ -63,7 +62,6 @@ export default function LeaderboardClient({
                   <td style={{ borderBottom: "1px solid #27272a", padding: "8px" }}>
                     {entry.score} / {entry.maxScore}
                   </td>
-                  <td style={{ borderBottom: "1px solid #27272a", padding: "8px" }}>{new Date(entry.createdAt).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>
