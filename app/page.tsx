@@ -16,10 +16,9 @@ export default function Home() {
                     backgroundColor: "#111111",
                 }}
             >
-                <h1 style={{ fontSize: "24px", marginBottom: "8px" }}>Logo Criteria Challenge</h1>
+                <h1 style={{ fontSize: "24px", marginBottom: "8px" }}>Logo Check Challenge</h1>
                 <p style={{ lineHeight: 1.6, marginBottom: "16px" }}>
-                    In every round, you will see a logo and a list of criteria. Your goal is to choose which criteria were not implemented in that logo.
-                    You can select multiple answers. Your local score is shown immediately, and the final score is verified by the backend.
+                    The game has two rounds. Round 1: Choose the real logo from the fake one before the 20-second timer expires. Round 2: Review a logo and its criteria, then identify which standards were not met by the designer."
                 </p>
 
                 <div style={{ display: "flex", flexWrap: "wrap" }}>

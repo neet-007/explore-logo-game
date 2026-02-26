@@ -27,7 +27,7 @@ export default function Navbar() {
                 >
                     <div className="font-bold text-lg md:text-xl text-white">
                         <Link href="/" style={{ textDecoration: 'none', color: 'white', display: 'block' }}>
-                            LENS<span style={{ color: '#3b82f6' }}>QUEST</span>
+                            LOGO<span style={{ color: '#3b82f6' }}>CHECK</span>
                         </Link>
                     </div>
 
