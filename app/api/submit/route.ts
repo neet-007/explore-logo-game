@@ -1,29 +1,31 @@
 import { NextResponse } from "next/server";
 import { calculateGameScore, insertSubmission } from "@/lib/db";
 import { invalidateLeaderboardCache } from "@/lib/cache";
-import type { AnswerPayload } from "@/lib/types";
+import type { AnswerPayload, RoundOneAnswerPayload } from "@/lib/types";
 
 type SubmitBody = {
   playerName?: string;
-  answers?: AnswerPayload[];
+  roundOneAnswers?: RoundOneAnswerPayload[];
+  roundTwoAnswers?: AnswerPayload[];
 };
 
 export async function POST(request: Request) {
   const body = (await request.json()) as SubmitBody;
   const playerName = (body.playerName || "").trim();
-  const answers = body.answers;
+  const roundOneAnswers = body.roundOneAnswers;
+  const roundTwoAnswers = body.roundTwoAnswers;
 
   if (!playerName) {
     return NextResponse.json({ error: "player_name_required" }, { status: 400 });
   }
 
-  if (!Array.isArray(answers)) {
+  if (!Array.isArray(roundOneAnswers) || !Array.isArray(roundTwoAnswers)) {
     return NextResponse.json({ error: "answers_required" }, { status: 400 });
   }
 
   try {
-    const { score, maxScore } = await calculateGameScore(answers);
-    await insertSubmission(playerName, answers, score, maxScore);
+    const { score, maxScore } = await calculateGameScore({ roundOneAnswers, roundTwoAnswers });
+    await insertSubmission(playerName, { roundOneAnswers, roundTwoAnswers }, score, maxScore);
     invalidateLeaderboardCache();
 
     return NextResponse.json({

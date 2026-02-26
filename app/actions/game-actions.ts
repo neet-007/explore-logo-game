@@ -1,17 +1,21 @@
 "use server";
 
-import { getLeaderboardCached, getQuestionsCached, invalidateLeaderboardCache, invalidateQuestionsCache } from "@/lib/cache";
+import { getLeaderboardCached, getQuestionsCached, getRoundOneQuestionsCached, invalidateLeaderboardCache, invalidateQuestionsCache } from "@/lib/cache";
 import {
   addAdminUserToDb,
+  addRoundOneQuestionToDb,
+  addRoundOneQuestionsBulkToDb,
   addQuestionToDb,
+  addRoundTwoQuestionsBulkToDb,
   calculateGameScore,
   getAdminByUsername,
   getAdminCount,
   insertSubmission,
+  validateRoundOneAnswer,
   validateSingleQuestionAnswer,
 } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/auth";
-import type { AnswerPayload, LeaderboardEntry, PublicQuestion } from "@/lib/types";
+import type { AnswerPayload, LeaderboardEntry, PublicQuestion, PublicRoundOneQuestion, RoundOneAnswerPayload } from "@/lib/types";
 
 type ActionError = {
   ok: false;
@@ -19,7 +23,7 @@ type ActionError = {
 };
 
 type QuestionsActionResult =
-  | { ok: true; questions: PublicQuestion[] }
+  | { ok: true; roundOneQuestions: PublicRoundOneQuestion[]; roundTwoQuestions: PublicQuestion[] }
   | ActionError;
 
 type LeaderboardActionResult =
@@ -34,8 +38,20 @@ type ValidateQuestionActionResult =
   | { ok: true; questionScore: number; correctPicked: number; totalCorrect: number }
   | ActionError;
 
+type ValidateRoundOneActionResult =
+  | { ok: true; questionScore: number; isCorrect: boolean; correctOption: "left" | "right" }
+  | ActionError;
+
+type RoundOneCorrectOptionResult =
+  | { ok: true; correctOption: "left" | "right" }
+  | ActionError;
+
 type AddQuestionActionResult =
   | { ok: true; questionId: number }
+  | ActionError;
+
+type AddBulkActionResult =
+  | { ok: true; count: number }
   | ActionError;
 
 type RevalidateActionResult =
@@ -77,8 +93,16 @@ async function requireAdminAuth(input: AdminCredentials): Promise<{ ok: true } |
 
 export async function getQuestionsAction(): Promise<QuestionsActionResult> {
   try {
-    const questions = await getQuestionsCached();
-    const publicQuestions: PublicQuestion[] = questions.map((question) => ({
+    const roundOneQuestions = await getRoundOneQuestionsCached();
+    const roundTwoQuestions = await getQuestionsCached();
+
+    const publicRoundOneQuestions: PublicRoundOneQuestion[] = roundOneQuestions.map((question) => ({
+      id: question.id,
+      leftImagePath: question.leftImagePath,
+      rightImagePath: question.rightImagePath,
+    }));
+
+    const publicRoundTwoQuestions: PublicQuestion[] = roundTwoQuestions.map((question) => ({
       id: question.id,
       logoPath: question.logoPath,
       criteria: question.criteria.map((criterion) => ({
@@ -87,9 +111,61 @@ export async function getQuestionsAction(): Promise<QuestionsActionResult> {
       })),
     }));
 
-    return { ok: true, questions: publicQuestions };
+    return { ok: true, roundOneQuestions: publicRoundOneQuestions, roundTwoQuestions: publicRoundTwoQuestions };
   } catch {
     return { ok: false, error: "failed_to_load_questions" };
+  }
+}
+
+export async function validateRoundOneQuestionAction(input: {
+  questionId: number;
+  selectedOption: "left" | "right";
+}): Promise<ValidateRoundOneActionResult> {
+  if (typeof input.questionId !== "number") {
+    return { ok: false, error: "invalid_round_one_question_id" };
+  }
+
+  if (input.selectedOption !== "left" && input.selectedOption !== "right") {
+    return { ok: false, error: "invalid_round_one_option" };
+  }
+
+  try {
+    const questions = await getRoundOneQuestionsCached();
+    const question = questions.find((item) => item.id === input.questionId);
+
+    if (!question) {
+      return { ok: false, error: "invalid_round_one_question_id" };
+    }
+
+    const result = validateRoundOneAnswer(question, input.selectedOption);
+    return { ok: true, ...result };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "failed_to_validate_round_one_question",
+    };
+  }
+}
+
+export async function getRoundOneCorrectOptionAction(input: { questionId: number }): Promise<RoundOneCorrectOptionResult> {
+  if (typeof input.questionId !== "number") {
+    return { ok: false, error: "invalid_round_one_question_id" };
+  }
+
+  try {
+    const questions = await getRoundOneQuestionsCached();
+    const question = questions.find((item) => item.id === input.questionId);
+
+    if (!question) {
+      return { ok: false, error: "invalid_round_one_question_id" };
+    }
+
+    return { ok: true, correctOption: question.correctOption };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "failed_to_get_round_one_correct_option",
+    };
   }
 }
 
@@ -134,7 +210,8 @@ export async function getLeaderboardAction(): Promise<LeaderboardActionResult> {
 
 export async function submitGameAction(input: {
   playerName: string;
-  answers: AnswerPayload[];
+  roundOneAnswers: RoundOneAnswerPayload[];
+  roundTwoAnswers: AnswerPayload[];
 }): Promise<SubmitActionResult> {
   const playerName = (input.playerName || "").trim();
 
@@ -142,13 +219,26 @@ export async function submitGameAction(input: {
     return { ok: false, error: "player_name_required" };
   }
 
-  if (!Array.isArray(input.answers)) {
+  if (!Array.isArray(input.roundOneAnswers) || !Array.isArray(input.roundTwoAnswers)) {
     return { ok: false, error: "answers_required" };
   }
 
   try {
-    const { score, maxScore } = await calculateGameScore(input.answers);
-    await insertSubmission(playerName, input.answers, score, maxScore);
+    const { score, maxScore } = await calculateGameScore({
+      roundOneAnswers: input.roundOneAnswers,
+      roundTwoAnswers: input.roundTwoAnswers,
+    });
+
+    await insertSubmission(
+      playerName,
+      {
+        roundOneAnswers: input.roundOneAnswers,
+        roundTwoAnswers: input.roundTwoAnswers,
+      },
+      score,
+      maxScore
+    );
+
     invalidateLeaderboardCache();
 
     return { ok: true, score, maxScore };
@@ -207,6 +297,122 @@ export async function addQuestionAction(input: {
     return { ok: true, questionId };
   } catch {
     return { ok: false, error: "failed_to_add_question" };
+  }
+}
+
+export async function addRoundOneQuestionAction(input: {
+  admin: AdminCredentials;
+  leftImagePath: string;
+  rightImagePath: string;
+  correctOption: "left" | "right";
+}): Promise<AddQuestionActionResult> {
+  const authResult = await requireAdminAuth(input.admin);
+  if (!authResult.ok) {
+    return authResult;
+  }
+
+  const leftImagePath = (input.leftImagePath || "").trim();
+  const rightImagePath = (input.rightImagePath || "").trim();
+
+  if (!leftImagePath || !rightImagePath) {
+    return { ok: false, error: "round_one_image_paths_required" };
+  }
+
+  if (input.correctOption !== "left" && input.correctOption !== "right") {
+    return { ok: false, error: "invalid_round_one_option" };
+  }
+
+  try {
+    const questionId = await addRoundOneQuestionToDb({
+      leftImagePath,
+      rightImagePath,
+      correctOption: input.correctOption,
+    });
+
+    if (!questionId) {
+      return { ok: false, error: "failed_to_add_round_one_question" };
+    }
+
+    invalidateQuestionsCache();
+    return { ok: true, questionId };
+  } catch {
+    return { ok: false, error: "failed_to_add_round_one_question" };
+  }
+}
+
+export async function addRoundOneQuestionsBulkAction(input: {
+  admin: AdminCredentials;
+  questions: Array<{ leftImagePath: string; rightImagePath: string; correctOption: "left" | "right" }>;
+}): Promise<AddBulkActionResult> {
+  const authResult = await requireAdminAuth(input.admin);
+  if (!authResult.ok) {
+    return authResult;
+  }
+
+  if (!Array.isArray(input.questions) || input.questions.length === 0) {
+    return { ok: false, error: "bulk_questions_required" };
+  }
+
+  const cleaned = input.questions
+    .map((question) => ({
+      leftImagePath: (question.leftImagePath || "").trim(),
+      rightImagePath: (question.rightImagePath || "").trim(),
+      correctOption: question.correctOption,
+    }))
+    .filter((question) => question.leftImagePath && question.rightImagePath && (question.correctOption === "left" || question.correctOption === "right"));
+
+  if (cleaned.length === 0) {
+    return { ok: false, error: "valid_bulk_round_one_questions_required" };
+  }
+
+  try {
+    const count = await addRoundOneQuestionsBulkToDb(cleaned);
+    invalidateQuestionsCache();
+    return { ok: true, count };
+  } catch {
+    return { ok: false, error: "failed_to_add_bulk_round_one_questions" };
+  }
+}
+
+export async function addRoundTwoQuestionsBulkAction(input: {
+  admin: AdminCredentials;
+  questions: Array<{ logoPath: string; criteria: Array<{ textAr: string; isOmitted: boolean }> }>;
+}): Promise<AddBulkActionResult> {
+  const authResult = await requireAdminAuth(input.admin);
+  if (!authResult.ok) {
+    return authResult;
+  }
+
+  if (!Array.isArray(input.questions) || input.questions.length === 0) {
+    return { ok: false, error: "bulk_questions_required" };
+  }
+
+  const cleaned = input.questions
+    .map((question) => ({
+      logoPath: (question.logoPath || "").trim(),
+      criteria: Array.isArray(question.criteria)
+        ? question.criteria
+            .map((criterion) => ({ textAr: (criterion.textAr || "").trim(), isOmitted: Boolean(criterion.isOmitted) }))
+            .filter((criterion) => criterion.textAr.length > 0)
+        : [],
+    }))
+    .filter((question) => {
+      if (!question.logoPath || question.criteria.length === 0) {
+        return false;
+      }
+      return question.criteria.some((criterion) => criterion.isOmitted);
+    });
+
+  if (cleaned.length === 0) {
+    return { ok: false, error: "valid_bulk_round_two_questions_required" };
+  }
+
+  try {
+    const count = await addRoundTwoQuestionsBulkToDb(cleaned);
+    invalidateQuestionsCache();
+    return { ok: true, count };
+  } catch {
+    return { ok: false, error: "failed_to_add_bulk_round_two_questions" };
   }
 }
 

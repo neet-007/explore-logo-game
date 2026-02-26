@@ -18,6 +18,16 @@ export const criteria = sqliteTable("criteria", {
   isOmitted: integer("is_omitted", { mode: "boolean" }).notNull(),
 });
 
+export const roundOneQuestions = sqliteTable("round_one_questions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  leftImagePath: text("left_image_path").notNull(),
+  rightImagePath: text("right_image_path").notNull(),
+  correctOption: text("correct_option").notNull(),
+  createdAt: text("created_at")
+    .notNull()
+    .default(sql`CURRENT_TIMESTAMP`),
+});
+
 export const submissions = sqliteTable("submissions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   playerName: text("player_name").notNull(),

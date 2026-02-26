@@ -1,9 +1,17 @@
 import { NextResponse } from "next/server";
-import { getQuestionsCached } from "@/lib/cache";
+import { getQuestionsCached, getRoundOneQuestionsCached } from "@/lib/cache";
 
 export async function GET() {
-  const questions = await getQuestionsCached();
-  const publicQuestions = questions.map((question) => ({
+  const roundOneQuestions = await getRoundOneQuestionsCached();
+  const roundTwoQuestions = await getQuestionsCached();
+
+  const publicRoundOneQuestions = roundOneQuestions.map((question) => ({
+    id: question.id,
+    leftImagePath: question.leftImagePath,
+    rightImagePath: question.rightImagePath,
+  }));
+
+  const publicRoundTwoQuestions = roundTwoQuestions.map((question) => ({
     id: question.id,
     logoPath: question.logoPath,
     criteria: question.criteria.map((criterion) => ({
@@ -12,5 +20,8 @@ export async function GET() {
     })),
   }));
 
-  return NextResponse.json({ questions: publicQuestions });
+  return NextResponse.json({
+    roundOneQuestions: publicRoundOneQuestions,
+    roundTwoQuestions: publicRoundTwoQuestions,
+  });
 }
